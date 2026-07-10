@@ -74,7 +74,7 @@ def setup_camera(location=(6, -6, 3), target=(0, 0, 1.5), dof_object=None):
     return cam
 
 
-def setup_render(output_path, engine='CYCLES', frame_end=120, resolution=(1280, 720), samples=64):
+def setup_render(output_path, engine='CYCLES', frame_end=120, resolution=(1280, 720), samples=64, device='CPU'):
     scene = bpy.context.scene
     scene.render.engine = engine
     scene.render.resolution_x = resolution[0]
@@ -89,7 +89,27 @@ def setup_render(output_path, engine='CYCLES', frame_end=120, resolution=(1280, 
     if engine == 'CYCLES':
         scene.cycles.samples = samples
         scene.cycles.use_denoising = True
-        try:
-            bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'NONE'
-        except Exception:
-            pass
+
+        if device == 'GPU':
+            try:
+                prefs = bpy.context.preferences.addons['cycles'].preferences
+                # Try CUDA first (most common free-tier Colab GPU), fall back to OPTIX
+                for backend in ('CUDA', 'OPTIX'):
+                    try:
+                        prefs.compute_device_type = backend
+                        break
+                    except Exception:
+                        continue
+                prefs.get_devices()
+                for d in prefs.devices:
+                    d.use = True
+                scene.cycles.device = 'GPU'
+            except Exception as e:
+                print(f"GPU setup failed, falling back to CPU: {e}")
+                scene.cycles.device = 'CPU'
+        else:
+            scene.cycles.device = 'CPU'
+            try:
+                bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'NONE'
+            except Exception:
+                pass
