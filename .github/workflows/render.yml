@@ -1,0 +1,42 @@
+name: Render Scene
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene_path:
+        description: 'Path to the scene script to render'
+        required: true
+        default: 'configs/reactor_cleaning/part3_boil_agitate.py'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Cache Blender
+        id: cache-blender
+        uses: actions/cache@v4
+        with:
+          path: blender
+          key: blender-4.2-linux
+
+      - name: Download Blender
+        if: steps.cache-blender.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz
+          tar -xf blender-4.2.0-linux-x64.tar.xz
+          mv blender-4.2.0-linux-x64 blender
+
+      - name: Render
+        run: |
+          ./blender/blender -b -P "${{ github.event.inputs.scene_path }}"
+
+      - name: Commit rendered output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/*.mp4
+          git commit -m "Render: ${{ github.event.inputs.scene_path }}" || echo "No changes to commit"
+          git push
