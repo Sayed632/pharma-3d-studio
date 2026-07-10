@@ -6,6 +6,54 @@ import bpy
 import math
 
 
+def add_bolt_ring(center, radius, bolt_count=16, bolt_radius=0.025, bolt_height=0.04, mat=None):
+    """Ring of small bolt heads around a flange, arranged in a circle."""
+    bolts = []
+    for i in range(bolt_count):
+        angle = (2 * math.pi / bolt_count) * i
+        x = center[0] + radius * math.cos(angle)
+        y = center[1] + radius * math.sin(angle)
+        bpy.ops.mesh.primitive_cylinder_add(
+            radius=bolt_radius, depth=bolt_height, vertices=6,
+            location=(x, y, center[2])
+        )
+        bolt = bpy.context.active_object
+        bolt.name = f"Bolt_{i}"
+        if mat:
+            bolt.data.materials.append(mat)
+        bolts.append(bolt)
+    return bolts
+
+
+def add_flange(location, outer_radius, thickness=0.06, bolt_count=16, name="Flange"):
+    """A flat ring flange with a bolt circle, e.g. at vessel top or a port base."""
+    mat = create_steel_material(name + "_Mat")
+    bpy.ops.mesh.primitive_torus_add(
+        location=location, major_radius=outer_radius * 0.85,
+        minor_radius=thickness, major_segments=32, minor_segments=12
+    )
+    flange = bpy.context.active_object
+    flange.name = name
+    flange.scale.z = 0.5
+    flange.data.materials.append(mat)
+    add_bolt_ring(location, outer_radius, bolt_count=bolt_count, mat=mat)
+    return flange
+
+
+def add_top_port(location, port_radius=0.12, port_height=0.25, name="Port"):
+    """A pipe nozzle sticking up from the vessel top, with a small flange cap."""
+    mat = create_steel_material(name + "_Mat")
+    x, y, z = location
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=port_radius, depth=port_height, location=(x, y, z + port_height / 2)
+    )
+    port = bpy.context.active_object
+    port.name = name
+    port.data.materials.append(mat)
+    add_flange((x, y, z + port_height), port_radius * 1.6, thickness=0.03, bolt_count=8, name=name + "_Flange")
+    return port
+
+
 def create_steel_material(name="SteelPolished"):
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
@@ -29,9 +77,10 @@ def create_liquid_material(name="Liquid", color=(0.15, 0.45, 0.75, 1.0)):
     return mat
 
 
-def build_vessel(radius=1.0, height=2.5, wall_thickness=0.05, name="Vessel", cutaway=True):
+def build_vessel(radius=1.0, height=2.5, wall_thickness=0.05, name="Vessel", cutaway=True, with_details=True):
     """Creates a hollow cylindrical vessel. If cutaway=True, removes a quarter
-    wedge of the wall so the interior (liquid, agitator) is visible to camera."""
+    wedge of the wall so the interior (liquid, agitator) is visible to camera.
+    If with_details=True, adds a top flange with bolt ring and nozzle ports."""
     bpy.ops.mesh.primitive_cylinder_add(
         radius=radius, depth=height, location=(0, 0, height / 2)
     )
@@ -58,6 +107,13 @@ def build_vessel(radius=1.0, height=2.5, wall_thickness=0.05, name="Vessel", cut
         cutter.hide_viewport = True
 
     vessel.data.materials.append(create_steel_material())
+
+    if with_details:
+        add_flange((0, 0, height), radius, bolt_count=20, name=name + "_TopFlange")
+        add_top_port((radius * 0.4, radius * 0.4, height), port_radius=0.08, name=name + "_Port1")
+        add_top_port((-radius * 0.4, radius * 0.4, height), port_radius=0.06, name=name + "_Port2")
+        add_top_port((0, -radius * 0.5, height), port_radius=0.1, name=name + "_Port3")
+
     return vessel
 
 
@@ -83,14 +139,15 @@ def create_agitator_material(name="SteelShaft"):
     return mat
 
 
-def build_agitator(shaft_radius=0.05, blade_length=0.7, shaft_height=2.2, name="Agitator"):
-    """Creates a rotating shaft + blades assembly, parented for easy keyframing."""
+def build_agitator(shaft_radius=0.05, blade_length=0.35, shaft_height=2.2, blade_count=4, name="Agitator"):
+    """Creates a rotating shaft + hub + pitched turbine blades, parented for easy keyframing."""
     bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, 0, 0))
     agitator_root = bpy.context.active_object
     agitator_root.name = name + "_Root"
 
     agitator_mat = create_agitator_material()
 
+    # Shaft running down from the top of the vessel
     bpy.ops.mesh.primitive_cylinder_add(
         radius=shaft_radius, depth=shaft_height, location=(0, 0, shaft_height / 2)
     )
@@ -99,13 +156,28 @@ def build_agitator(shaft_radius=0.05, blade_length=0.7, shaft_height=2.2, name="
     shaft.data.materials.append(agitator_mat)
     shaft.parent = agitator_root
 
-    for i in range(2):
-        angle = i * math.pi
-        bpy.ops.mesh.primitive_cube_add(
-            size=1, location=(blade_length / 2 * math.cos(angle), blade_length / 2 * math.sin(angle), 0.15)
-        )
+    # Hub where blades attach, positioned near the bottom of the shaft
+    hub_z = 0.35
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=shaft_radius * 2.2, depth=0.18, location=(0, 0, hub_z)
+    )
+    hub = bpy.context.active_object
+    hub.name = name + "_Hub"
+    hub.data.materials.append(agitator_mat)
+    hub.parent = agitator_root
+
+    # Pitched turbine blades: angled rectangles radiating from the hub, tilted
+    # like a real Rushton/pitched-blade turbine so they read as functional, not flat.
+    for i in range(blade_count):
+        angle = (2 * math.pi / blade_count) * i
+        bx = (blade_length / 2 + shaft_radius * 2.2) * math.cos(angle)
+        by = (blade_length / 2 + shaft_radius * 2.2) * math.sin(angle)
+
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(bx, by, hub_z))
         blade = bpy.context.active_object
-        blade.scale = (blade_length / 2, 0.05, 0.15)
+        blade.scale = (blade_length / 2, 0.14, 0.02)
+        blade.rotation_euler[2] = angle
+        blade.rotation_euler[1] = 0.5  # ~28 degree pitch for realistic turbine angle
         blade.name = f"{name}_Blade_{i}"
         blade.data.materials.append(agitator_mat)
         blade.parent = agitator_root

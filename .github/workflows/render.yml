@@ -32,6 +32,19 @@ jobs:
           tar -xf blender-4.2.0-linux-x64.tar.xz
           mv blender-4.2.0-linux-x64 blender
 
+      - name: Cache HDRI
+        id: cache-hdri
+        uses: actions/cache@v4
+        with:
+          path: assets/hdri
+          key: hdri-studio-small-v1
+
+      - name: Download HDRI
+        if: steps.cache-hdri.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p assets/hdri
+          curl -sL -o assets/hdri/studio.hdr "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr" || echo "HDRI download failed, will fall back to flat lighting"
+
       - name: Render
         run: |
           ./blender/blender -b -P "${{ github.event.inputs.scene_path }}"

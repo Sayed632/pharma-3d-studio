@@ -13,13 +13,26 @@ def clear_scene():
             bpy.data.materials.remove(block)
 
 
-def setup_world_lighting(strength=1.2):
-    """Simple studio-style world lighting. Swap for an HDRI file later by
-    setting world.node_tree.nodes['Environment Texture'].image = bpy.data.images.load(path)."""
+def setup_world_lighting(strength=1.0, hdri_path=None):
+    """Studio-style world lighting. If hdri_path is given and exists, uses it as
+    an Environment Texture for realistic reflections/lighting (e.g. a Poly Haven HDRI).
+    Falls back to flat dark background if no HDRI is available."""
     world = bpy.data.worlds.get("World") or bpy.data.worlds.new("World")
     bpy.context.scene.world = world
     world.use_nodes = True
-    bg = world.node_tree.nodes.get("Background")
+    nodes = world.node_tree.nodes
+    links = world.node_tree.links
+    bg = nodes.get("Background")
+
+    if hdri_path:
+        import os
+        if os.path.exists(hdri_path):
+            env_tex = nodes.new(type="ShaderNodeTexEnvironment")
+            env_tex.image = bpy.data.images.load(hdri_path)
+            links.new(env_tex.outputs["Color"], bg.inputs["Color"])
+            bg.inputs["Strength"].default_value = strength
+            return
+
     bg.inputs["Color"].default_value = (0.05, 0.06, 0.09, 1.0)
     bg.inputs["Strength"].default_value = strength
 

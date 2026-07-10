@@ -12,7 +12,8 @@ import vessel
 import scene_setup
 
 scene_setup.clear_scene()
-scene_setup.setup_world_lighting(strength=1.0)
+hdri_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "hdri", "studio.hdr")
+scene_setup.setup_world_lighting(strength=1.0, hdri_path=hdri_path)
 scene_setup.add_key_fill_lights()
 
 reactor = vessel.build_vessel(radius=1.0, height=2.5, name="ReactorVessel")
