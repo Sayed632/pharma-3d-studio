@@ -25,7 +25,7 @@ vessel.animate_rotation(agitator, start_frame=1, end_frame=120, revolutions=3)
 scene_setup.setup_camera(location=(5, -5, 2.5), target=(0, 0, 1.2), dof_object=reactor)
 
 output_path = os.path.join(os.path.dirname(__file__), "..", "..", "output", "part3_boil_agitate.mp4")
-scene_setup.setup_render(output_path, engine='CYCLES', frame_end=120, resolution=(1280, 720), samples=32)
+scene_setup.setup_render(output_path, engine='CYCLES', frame_end=120, resolution=(1280, 720), samples=64)
 
 import bpy
 bpy.ops.render.render(animation=True)

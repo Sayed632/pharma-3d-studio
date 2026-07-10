@@ -27,13 +27,18 @@ def setup_world_lighting(strength=1.2):
 def add_key_fill_lights():
     bpy.ops.object.light_add(type='AREA', radius=3, location=(4, -4, 5))
     key = bpy.context.active_object
-    key.data.energy = 800
+    key.data.energy = 1500
     key.data.color = (1.0, 0.98, 0.95)
 
     bpy.ops.object.light_add(type='AREA', radius=4, location=(-5, 3, 3))
     fill = bpy.context.active_object
-    fill.data.energy = 300
+    fill.data.energy = 600
     fill.data.color = (0.85, 0.9, 1.0)
+
+    bpy.ops.object.light_add(type='POINT', location=(1.5, -1.5, 1.5))
+    interior = bpy.context.active_object
+    interior.data.energy = 200
+    interior.data.color = (1.0, 1.0, 1.0)
 
 
 def setup_camera(location=(6, -6, 3), target=(0, 0, 1.5), dof_object=None):
